@@ -6,32 +6,65 @@
 //
 
 import SwiftUI
-
-struct ProcessRow: View {
-    var process: AudioProcess
+import Foundation
 
 
+enum Tabs: Equatable, Hashable, Identifiable {
+    case chains
+    case processes
+    var id: Self { self }
+}
+
+struct MixerRow: View {
+    @Bindable var chain: AudioChain
+    
     var body: some View {
-        HStack( spacing: 3) {
-            if let nsImage = process.getIcon(){
-             Image(nsImage: nsImage)
+        HStack(spacing: 15) {
+            if let icon = chain.process.getIcon() {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 24, height: 24)
             }
-            Text(process.name)
-                .foregroundColor(.primary)
-                .font(.headline)
-            Text(String(process.id))
+            
+            Text(chain.process.name)
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 120, alignment: .leading)
+            
+            Slider(value: $chain.volume, in: 0...1)
+                .tint(.accentColor)
+            
+            Text("\(Int(chain.volume * 100))%")
+                .font(.system(.body, design: .monospaced))
+                .frame(width: 45, alignment: .trailing)
         }
+        .padding(.horizontal)
+        .frame(height: 40)
     }
 }
 
 struct ContentView: View {
     @Environment(AudioMixer.self) private var mixer
+    
+    @State private var selectedTab :Tabs = .chains
     var body: some View {
-        List(mixer.audioChainManager.chains){ chain in
-            Slider(value: Binding(
-                        get: { Double(chain.volume) },
-                        set: { chain.volume = Double(Float($0)) }
-            ), in: 0...1.5)
+        
+        TabView(selection: $selectedTab){
+            Tab("Chains", systemImage: "play", value: .chains){
+                
+                if !mixer.isShuttingDown {
+                    List(mixer.chains){ chain in
+                        MixerRow(chain: chain)
+                    }
+                }
+            }
+            Tab("Chains", systemImage: "play", value: .processes){
+                
+                if !mixer.isShuttingDown {
+                    List(mixer.audioProcessList){ process in
+                        Text(process.name)
+                    }
+                }
+            }
         }
     }
 }

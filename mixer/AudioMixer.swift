@@ -8,59 +8,76 @@
 import Foundation
 import CoreAudio
 import os
+import QuartzCore
 
 @Observable class AudioMixer {
     
-   
+    var chains : [AudioChain] = [AudioChain]()
+    private let chainsQueue = DispatchQueue(label: "com.mixer.chains", attributes: [])
+    private let queue = DispatchQueue(
+        label: "com.mixer.audio.chains",
+        qos: .userInteractive,
+    )
+    
     var audioProcessList = [AudioProcess]()
     
     var defaultOutputDevice: AudioDevice!
-    let audioChainManager: AudioChainManager = AudioChainManager()
     
     var processListAddress: AudioObjectPropertyAddress = getPropertyAddress(selector: kAudioHardwarePropertyProcessObjectList)
     var tapListAddress: AudioObjectPropertyAddress = getPropertyAddress(selector: kAudioHardwarePropertyTapList)
     var defaultOutputDeviceAddress: AudioObjectPropertyAddress = getPropertyAddress(selector: kAudioHardwarePropertyDefaultOutputDevice)
     
-    static var shared: AudioMixer?
     var listsChangedToken: AudioObjectPropertyListenerBlock?
 
+    var isShuttingDown = false
    
     init(){
-        Self.shared = self
         loadProcessList()
         loadDefaultAudioDevice()
         
         if let spotify = findProcess(name:"Spotify"){
             Logger.mixer.info("spotify found \(spotify.id)")
-            audioChainManager.createChain(for: spotify, to: self.defaultOutputDevice)
+            self.addChain(for: spotify , out: defaultOutputDevice )
+        }
+        
+        if let brave = findProcess(name:"Brave Browser He"){
+            Logger.mixer.info("brave found \(brave.id)")
+            self.addChain(for: brave , out: defaultOutputDevice )
         }
     }
  
     func setupListeners() {
-        let listsChanged: AudioObjectPropertyListenerBlock = { inNumberAddresses, inAddresses in
-            guard let mixer = AudioMixer.shared else { return}
-            
-            for i in 0..<Int(inNumberAddresses) {
-                let address = inAddresses[i]
-            }
+//        let listsChanged: AudioObjectPropertyListenerBlock = { inNumberAddresses, inAddresses in
+//            guard let mixer = AudioMixer.shared else { return}
+//            
+//            for i in 0..<Int(inNumberAddresses) {
+//                let address = inAddresses[i]
+//            }
+//        }
+//        
+//        
+//        AudioObjectAddPropertyListenerBlock(
+//            AudioObjectID(kAudioObjectSystemObject),
+//            &tapListAddress,
+//            DispatchQueue.main,
+//            listsChanged
+//        )
+//        
+//        self.listsChangedToken = listsChanged
+    }
+    
+   
+    func addChain(for process: AudioProcess, out outputDevice: AudioDevice){
+        guard let chain = AudioChain(for: process, to: outputDevice, queue: queue) else {return}
+       
+        chainsQueue.sync {
+            chains.append(chain)
         }
         
-        // Ważne: Przechowuj token, aby listener nie został zwolniony z pamięci!
-        
-        AudioObjectAddPropertyListenerBlock(
-            AudioObjectID(kAudioObjectSystemObject),
-            &tapListAddress,
-            DispatchQueue.main,
-            listsChanged
-        )
-        
-        self.listsChangedToken = listsChanged
     }
     
     
     func loadProcessList(){
-        
-        audioProcessList = [AudioProcess]()
         
         var propertySize: UInt32 = 0
         AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &processListAddress, 0, nil, &propertySize)
@@ -73,8 +90,27 @@ import os
         }
     }
     
-    func shoutDown(){
-        audioChainManager.unchainAll()
+    func shoutDown() {
+        self.isShuttingDown = true
+        
+        let chainsToDestroy = self.chains
+        self.chains = []
+        
+        chainsQueue.async {
+            for chain in chainsToDestroy {
+                chain.destroy()
+            }
+            
+            Logger.mixer.info("Cleanup finished. Safe to exit.")
+        }
+    }
+    
+    private func performHardwareCleanup(for chains: [AudioChain]) {
+        self.chainsQueue.async {
+            for chain in chains{
+                chain.destroy()
+            }
+        }
     }
     
     func findProcess(name: String ) -> AudioProcess?{
@@ -90,6 +126,8 @@ import os
         
     }
 }
+
+
 
 
 extension AudioMixer{

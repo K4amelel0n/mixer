@@ -92,8 +92,8 @@ class AudioProcess: Identifiable, Hashable {
     }
     
     func notifyProcessStopped() {
-        guard let model = AudioMixer.shared else { return }
-        model.processStopped()
+//        guard let model = AudioMixer.shared else { return }
+//        model.processStopped()
     }
     
     private func processNameFromPID(pid: Int32) -> String {
