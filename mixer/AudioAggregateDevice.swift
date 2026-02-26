@@ -40,8 +40,8 @@ struct AggregateDescription {
 class AudioAggregateDevice {
     let id: AudioObjectID
     
-    init?(for process: AudioProcess,in audioTap: AudioTap, out outputDevice: AudioDevice, ){
-        let aggregateDescription = AggregateDescription(name: "Mixer-\(process.pid)", tapUUID: audioTap.uuid, outputDeviceUID: outputDevice.uid)
+    init?(for app: AudioApp,in audioTap: AudioTap, out outputDevice: AudioDevice, ){
+        let aggregateDescription = AggregateDescription(name: "Mixer-\(app.name)", tapUUID: audioTap.uuid, outputDeviceUID: outputDevice.uid)
        
         var aggregateDeviceID: AudioObjectID = AudioObjectID(kAudioObjectUnknown)
         

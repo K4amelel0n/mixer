@@ -9,8 +9,11 @@ import Foundation
 import CoreAudio
 import os
 import QuartzCore
+import AppKit
 
-@Observable class AudioMixer {
+@Observable class AudioMixer : AudioProcessMonitorDelegate {
+    
+    
     
     var chains : [AudioChain] = [AudioChain]()
     private let chainsQueue = DispatchQueue(label: "com.mixer.chains", attributes: [])
@@ -20,6 +23,8 @@ import QuartzCore
     )
     
     var audioProcessList = [AudioProcess]()
+   
+    var audioProcessMonitor = AudioProcessMonitor()
     
     var defaultOutputDevice: AudioDevice!
     
@@ -32,66 +37,59 @@ import QuartzCore
     var isShuttingDown = false
    
     init(){
-        loadProcessList()
         loadDefaultAudioDevice()
-        
-        if let spotify = findProcess(name:"Spotify"){
-            Logger.mixer.info("spotify found \(spotify.id)")
-            self.addChain(for: spotify , out: defaultOutputDevice )
-        }
-        
-        if let brave = findProcess(name:"Brave Browser He"){
-            Logger.mixer.info("brave found \(brave.id)")
-            self.addChain(for: brave , out: defaultOutputDevice )
-        }
-    }
- 
-    func setupListeners() {
-//        let listsChanged: AudioObjectPropertyListenerBlock = { inNumberAddresses, inAddresses in
-//            guard let mixer = AudioMixer.shared else { return}
-//            
-//            for i in 0..<Int(inNumberAddresses) {
-//                let address = inAddresses[i]
-//            }
-//        }
-//        
-//        
-//        AudioObjectAddPropertyListenerBlock(
-//            AudioObjectID(kAudioObjectSystemObject),
-//            &tapListAddress,
-//            DispatchQueue.main,
-//            listsChanged
-//        )
-//        
-//        self.listsChangedToken = listsChanged
+        audioProcessMonitor.delegate = self
+        audioProcessMonitor.start()
     }
     
+    
+    func registerListeners() {
+        audioProcessMonitor.registerListener()
+
+    }
    
-    func addChain(for process: AudioProcess, out outputDevice: AudioDevice){
-        guard let chain = AudioChain(for: process, to: outputDevice, queue: queue) else {return}
+    func monitor(_ monitor: AudioProcessMonitor, didUpdateApps apps: [AudioApp]) {
+        let chainsToDestroy = chains.filter { chain in
+            !apps.contains(where: { $0.name == chain.app.name })
+        }
+
+        chainsToDestroy.forEach { $0.destroy() }
+
+        chains.removeAll { chain in
+            chainsToDestroy.contains(where: { $0 === chain })
+        }
        
+        for app in apps{
+            if(!chains.contains(where: {chain in chain.app.name == app.name})){
+                addChain(for: app, out: defaultOutputDevice)
+            }
+        }
+    }
+    
+    func createChains(for apps: [AudioApp]){
+        for app in apps{
+            addChain(for: app, out: defaultOutputDevice)
+        }
+    }
+
+    
+    func unregisterListeners() {
+        audioProcessMonitor.unregisterListeners()
+    }
+    
+    private func addChain(for app: AudioApp, out outputDevice: AudioDevice){
+        guard let chain = AudioChain(for: app, to: outputDevice, queue: queue) else {return}
+
         chainsQueue.sync {
             chains.append(chain)
         }
         
     }
-    
-    
-    func loadProcessList(){
         
-        var propertySize: UInt32 = 0
-        AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &processListAddress, 0, nil, &propertySize)
-        let processCount = Int(propertySize) / MemoryLayout<AudioObjectID>.stride
-        var list: [AudioObjectID] = [AudioObjectID](repeating: 0, count: processCount)
-        AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &processListAddress, 0, nil, &propertySize, &list)
-        
-        for index in 0..<list.count {
-            audioProcessList.append(AudioProcess(id: list[index]))
-        }
-    }
-    
+
     func shoutDown() {
         self.isShuttingDown = true
+        self.unregisterListeners()
         
         let chainsToDestroy = self.chains
         self.chains = []
@@ -102,14 +100,6 @@ import QuartzCore
             }
             
             Logger.mixer.info("Cleanup finished. Safe to exit.")
-        }
-    }
-    
-    private func performHardwareCleanup(for chains: [AudioChain]) {
-        self.chainsQueue.async {
-            for chain in chains{
-                chain.destroy()
-            }
         }
     }
     

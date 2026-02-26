@@ -12,8 +12,8 @@ class AudioTap {
     let id: AudioObjectID
     let uuid: String
     
-    init?(for process: AudioProcess) {
-        let tapDesc = CATapDescription(stereoMixdownOfProcesses: [process.id])
+    init?(for app: AudioApp) {
+        let tapDesc = CATapDescription(stereoMixdownOfProcesses: app.processes.map({process in process.id}))
         tapDesc.uuid = UUID()
         tapDesc.muteBehavior = .mutedWhenTapped
         
@@ -26,7 +26,7 @@ class AudioTap {
         self.id = tapID
         self.uuid = tapDesc.uuid.uuidString
     }
-   
+    
     func destroy(){
         AudioHardwareDestroyProcessTap(self.id)
     }

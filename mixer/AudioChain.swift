@@ -11,7 +11,7 @@ import os
 
 
 @Observable class AudioChain : Identifiable {
-    let process: AudioProcess
+    let app: AudioApp
     let tap: AudioTap
     let aggregateDevice: AudioAggregateDevice
     var ioProcID: AudioDeviceIOProcID?
@@ -19,21 +19,21 @@ import os
     var volume: Double = 1.0
 
    
-    init?(for process: AudioProcess, to outputDevice:AudioDevice, queue: DispatchQueue){
-        guard let tap = AudioTap(for: process) else {return nil}
+    init?(for app: AudioApp, to outputDevice:AudioDevice, queue: DispatchQueue){
+        guard let tap = AudioTap(for: app) else {return nil}
         
-        guard let aggregateDevice = AudioAggregateDevice(for: process, in: tap, out: outputDevice) else {
+        guard let aggregateDevice = AudioAggregateDevice(for: app, in: tap, out: outputDevice) else {
             tap.destroy()
             return nil
         }
         
-        self.process = process
+        self.app = app
         self.tap = tap
         self.aggregateDevice = aggregateDevice
         
         actiavte(queue: queue)
     }
-        
+           
         func actiavte(queue: DispatchQueue){
             
             let err = AudioDeviceCreateIOProcIDWithBlock(&self.ioProcID, aggregateDevice.id, queue) { [weak self] _, inInputData, _, outOutputData, _ in

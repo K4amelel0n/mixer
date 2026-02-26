@@ -20,13 +20,13 @@ struct MixerRow: View {
     
     var body: some View {
         HStack(spacing: 15) {
-            if let icon = chain.process.getIcon() {
+            if let icon = chain.app.icon {
                 Image(nsImage: icon)
                     .resizable()
                     .frame(width: 24, height: 24)
             }
             
-            Text(chain.process.name)
+            Text(chain.app.name)
                 .font(.system(size: 14, weight: .medium))
                 .frame(width: 120, alignment: .leading)
             
@@ -54,14 +54,6 @@ struct ContentView: View {
                 if !mixer.isShuttingDown {
                     List(mixer.chains){ chain in
                         MixerRow(chain: chain)
-                    }
-                }
-            }
-            Tab("Chains", systemImage: "play", value: .processes){
-                
-                if !mixer.isShuttingDown {
-                    List(mixer.audioProcessList){ process in
-                        Text(process.name)
                     }
                 }
             }
