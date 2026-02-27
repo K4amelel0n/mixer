@@ -13,7 +13,6 @@ class AudioDevice: Identifiable, Hashable {
     init(id: AudioObjectID) {
         self.id = id
         
-        // Get the UID of the device.
         var propertyAddress = getPropertyAddress(selector: kAudioDevicePropertyDeviceUID)
         var propertySize = UInt32(MemoryLayout<CFString>.stride)
         var uid: CFString = "" as CFString

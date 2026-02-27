@@ -8,13 +8,6 @@
 import SwiftUI
 import Foundation
 
-
-enum Tabs: Equatable, Hashable, Identifiable {
-    case chains
-    case processes
-    var id: Self { self }
-}
-
 struct MixerRow: View {
     @Bindable var chain: AudioChain
     
@@ -32,6 +25,8 @@ struct MixerRow: View {
             
             Slider(value: $chain.volume, in: 0...1)
                 .tint(.accentColor)
+                .frame(minWidth: 80)
+                .layoutPriority(1)
             
             Text("\(Int(chain.volume * 100))%")
                 .font(.system(.body, design: .monospaced))
@@ -45,20 +40,23 @@ struct MixerRow: View {
 struct ContentView: View {
     @Environment(AudioMixer.self) private var mixer
     
-    @State private var selectedTab :Tabs = .chains
     var body: some View {
-        
-        TabView(selection: $selectedTab){
-            Tab("Chains", systemImage: "play", value: .chains){
-                
+            VStack(spacing: 10) {
                 if !mixer.isShuttingDown {
-                    List(mixer.chains){ chain in
+                    List(mixer.chains) { chain in
                         MixerRow(chain: chain)
                     }
+                    .frame(minWidth: 500, maxWidth: 800)
                 }
+                
+                Divider()
+                
+                Button("Quit App") {
+                    NSApp.terminate(nil)
+                }
+                .padding(8)
             }
         }
-    }
 }
 
 #Preview {

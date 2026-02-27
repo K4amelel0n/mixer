@@ -40,6 +40,7 @@ struct AggregateDescription {
 class AudioAggregateDevice {
     let id: AudioObjectID
     
+    
     init?(for app: AudioApp,in audioTap: AudioTap, out outputDevice: AudioDevice, ){
         let aggregateDescription = AggregateDescription(name: "Mixer-\(app.name)", tapUUID: audioTap.uuid, outputDeviceUID: outputDevice.uid)
        
@@ -56,6 +57,10 @@ class AudioAggregateDevice {
     
     func destroy(){
         AudioHardwareDestroyAggregateDevice(self.id)
+    }
+    
+    func getSampleRate() -> Float64? {
+        return try? readProperty(for: self.id, kAudioDevicePropertyNominalSampleRate, defualtValue: Float64(48000))
     }
 }
 

@@ -40,6 +40,7 @@ import AppKit
         loadDefaultAudioDevice()
         audioProcessMonitor.delegate = self
         audioProcessMonitor.start()
+        
     }
     
     
@@ -91,16 +92,19 @@ import AppKit
         self.isShuttingDown = true
         self.unregisterListeners()
         
-        let chainsToDestroy = self.chains
-        self.chains = []
-        
-        chainsQueue.async {
-            for chain in chainsToDestroy {
-                chain.destroy()
-            }
-            
-            Logger.mixer.info("Cleanup finished. Safe to exit.")
+        let chainsToDestroy = self.chainsQueue.sync {
+            let list = self.chains
+            self.chains = []
+            return list
         }
+        
+        Logger.mixer.info("Starting destruction of \(chainsToDestroy.count) chains")
+        
+        for chain in chainsToDestroy {
+            chain.destroy()
+        }
+        
+        Logger.mixer.info("Cleanup finished in AudioMixer")
     }
     
     func findProcess(name: String ) -> AudioProcess?{
@@ -141,4 +145,32 @@ public func getPropertyAddress(selector: AudioObjectPropertySelector,
                                    scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal,
                                    element: AudioObjectPropertyElement = kAudioObjectPropertyElementMain) -> AudioObjectPropertyAddress {
         return AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: element)
+}
+
+public func readProperty<T>(_ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, defualtValue: T) throws -> T {
+   
+    var address = getPropertyAddress(selector: selector, scope: scope)
+    var value = defualtValue
+    var size = UInt32(MemoryLayout<AudioObjectID>.size)
+    let error = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &value)
+  
+    guard error == noErr else{
+        throw NSError(domain: NSOSStatusErrorDomain, code: Int(error))
+    }
+    
+    return value
+}
+
+public func readProperty<T>(for id: AudioObjectID, _ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal, defualtValue: T) throws -> T {
+   
+    var address = getPropertyAddress(selector: selector, scope: scope)
+    var value = defualtValue
+    var size = UInt32(MemoryLayout<T>.size)
+    let error = AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value)
+  
+    guard error == noErr else{
+        throw NSError(domain: NSOSStatusErrorDomain, code: Int(error))
+    }
+    
+    return value
 }

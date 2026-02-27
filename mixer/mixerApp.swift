@@ -14,14 +14,12 @@ class AppDelegate: NSObject, NSApplicationDelegate{
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Logger.mixer.info("App terminating - cleaning up")
         
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.mixer?.shoutDown()
+        guard let mixer = mixer else {return .terminateNow}
+        
+        mixer.shoutDown()
             
-            DispatchQueue.main.async {
-                Logger.mixer.info("Cleanup complete")
-                sender.reply(toApplicationShouldTerminate: true)
-            }
-        }
+        Logger.mixer.info("Cleanup complete")
+        sender.reply(toApplicationShouldTerminate: true)
         
         return .terminateLater
     }
@@ -35,13 +33,21 @@ struct mixerApp: App {
     @State private var mixer = AudioMixer()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    init(){}
+    init() {
+            NSApplication.shared.setActivationPolicy(.accessory)
+        }
     
     var body: some Scene {
-        WindowGroup {
-            ContentView().environment(mixer).onAppear{
+        
+        MenuBarExtra("", systemImage: "point.topleft.down.curvedto.point.bottomright.up"){
+            
+            ContentView()
+                .environment(mixer)
+                
+        }
+        .menuBarExtraStyle(.window)
+        .onChange(of: true, initial: true){
                 appDelegate.mixer = mixer
-            }
         }
     }
 }
