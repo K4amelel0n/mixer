@@ -28,26 +28,19 @@ import AppKit
     
     var defaultOutputDevice: AudioDevice!
     
-    var processListAddress: AudioObjectPropertyAddress = getPropertyAddress(selector: kAudioHardwarePropertyProcessObjectList)
-    var tapListAddress: AudioObjectPropertyAddress = getPropertyAddress(selector: kAudioHardwarePropertyTapList)
     var defaultOutputDeviceAddress: AudioObjectPropertyAddress = getPropertyAddress(selector: kAudioHardwarePropertyDefaultOutputDevice)
     
-    var listsChangedToken: AudioObjectPropertyListenerBlock?
+    private var defaultAudioDeviceToken : AudioObjectPropertyListenerBlock?
 
     var isShuttingDown = false
    
     init(){
+        registerDefaultAudioDeviceListener()
         loadDefaultAudioDevice()
         audioProcessMonitor.delegate = self
         audioProcessMonitor.start()
-        
     }
     
-    
-    func registerListeners() {
-        audioProcessMonitor.registerListener()
-
-    }
    
     func monitor(_ monitor: AudioProcessMonitor, didUpdateApps apps: [AudioApp]) {
         let chainsToDestroy = chains.filter { chain in
@@ -76,6 +69,7 @@ import AppKit
     
     func unregisterListeners() {
         audioProcessMonitor.unregisterListeners()
+        unregisterDefaultAudioDeviceListener()
     }
     
     private func addChain(for app: AudioApp, out outputDevice: AudioDevice){
@@ -126,6 +120,7 @@ import AppKit
 
 extension AudioMixer{
    
+    
     func loadDefaultAudioDevice(){
         var address = defaultOutputDeviceAddress
         var deviceID: AudioObjectID = 0
@@ -138,6 +133,52 @@ extension AudioMixer{
             Logger.mixer.error("Cant get defualt output device ID")
         }
     }
+    
+   
+    func registerDefaultAudioDeviceListener(){
+        
+        let defualtDeviceChanged: AudioObjectPropertyListenerBlock = { [weak self] inNumberAddresses, inAddresses in
+                   guard let self else { return }
+            
+                   for index in 0..<inNumberAddresses {
+                       let address = inAddresses[Int(index)]
+                       switch address.mSelector {
+                       case kAudioHardwarePropertyDefaultOutputDevice:
+                           self.defaultOutputDeviceChanged()
+                       default: break
+                       }
+                   }
+               }
+               
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &defaultOutputDeviceAddress,
+            DispatchQueue.main,
+            defualtDeviceChanged)
+        
+        self.defaultAudioDeviceToken = defualtDeviceChanged
+        
+    }
+    
+    func unregisterDefaultAudioDeviceListener(){
+        if let token = defaultAudioDeviceToken {
+            AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &defaultOutputDeviceAddress,
+                DispatchQueue.main,
+                token)
+            defaultAudioDeviceToken = nil
+        }
+    }
+    
+    func defaultOutputDeviceChanged(){
+        loadDefaultAudioDevice()
+        
+        for chain in chains{
+            chain.aggregateDevice.changeOutputDevice(for: defaultOutputDevice)
+        }
+    }
+    
 }
 
 
@@ -174,3 +215,4 @@ public func readProperty<T>(for id: AudioObjectID, _ selector: AudioObjectProper
     
     return value
 }
+

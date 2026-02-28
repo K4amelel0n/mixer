@@ -4,6 +4,7 @@
 //
 //  Created by DawidKozaczuk on 19/02/2026.
 //
+
 import Foundation
 import os
 import CoreAudio
@@ -61,6 +62,18 @@ class AudioAggregateDevice {
     
     func getSampleRate() -> Float64? {
         return try? readProperty(for: self.id, kAudioDevicePropertyNominalSampleRate, defualtValue: Float64(48000))
+    }
+    
+   
+    func changeOutputDevice(for newOutputDevice: AudioDevice){
+        let aggregateDevice = AudioHardwareAggregateDevice(id: self.id)
+        let clockSourceDevice = AudioHardwareClock(id: newOutputDevice.id)
+        do{
+            try aggregateDevice.setClockSource(clockSourceDevice)
+            try aggregateDevice.setSubdevices([clockSourceDevice])
+        }catch{
+            Logger.mixer.error("change output device failed for aggregate device \(self.id)")
+        }
     }
 }
 
